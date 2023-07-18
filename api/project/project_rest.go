@@ -42,6 +42,20 @@ type projectInfo struct {
 	Id string `json:"id"`
 }
 
+type projectWebhook struct {
+	Items         []projectWebhookItem `json:"items"`
+	NextPageToken string        `json:"next_page_token"`
+}
+
+type projectWebhookItem struct {
+	URL           string   `json:"url"`
+	VerifyTLS     bool     `json:"verify-tls"`
+	ID            string   `json:"id"`
+	SigningSecret string   `json:"signing-secret"`
+	Name          string   `json:"name"`
+	Events        []string `json:"events"`
+}
+
 // NewProjectRestClient returns a new projectRestClient satisfying the api.ProjectInterface
 // interface via the REST API.
 func NewProjectRestClient(config settings.Config) (*projectRestClient, error) {
@@ -168,4 +182,48 @@ func (c *projectRestClient) ProjectInfo(vcs string, org string, project string) 
 	return &ProjectInfo{
 		Id: resp.Id,
 	}, nil
+}
+
+func (c *projectRestClient) ListProjectWebhook(id string) ([]*ProjectWebhook, error) {
+	path := fmt.Sprintf("webhook")
+	var nextPageToken string
+	res := make([]*ProjectWebhook,0)
+
+	for {
+		req, err := c.client.NewRequest("GET", &url.URL{Path: path}, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		q := req.URL.Query()
+		q.Add("scope-id", id)
+		q.Add("scope-type", "project")
+		q.Add("next-page-token", nextPageToken)
+		req.URL.RawQuery = q.Encode()
+
+		var resp projectWebhook
+		_, err = c.client.DoRequest(req, &resp)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, wh := range resp.Items {
+			res = append(res, &ProjectWebhook{
+				URL: wh.URL,
+				VerifyTLS: wh.VerifyTLS,
+				ID: wh.ID,
+				SigningSecret: wh.SigningSecret,
+				Name: wh.Name,
+				Events: wh.Events,
+			})
+		}
+
+		if resp.NextPageToken == "" {
+			break
+		}
+
+		nextPageToken = resp.NextPageToken
+
+	}
+	return res, nil
 }

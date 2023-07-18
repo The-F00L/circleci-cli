@@ -393,3 +393,100 @@ func Test_projectRestClient_ProjectInfo(t *testing.T) {
 		})
 	}
 }
+
+func Test_projectRestClient_ListProjectWebhook(t *testing.T) {
+	const (
+		projId   = "0000-0000-0000-0000"
+		projType = "project"
+		nextPageToken = ""
+	)
+	tests := []struct {
+		name     string
+		handler  http.HandlerFunc
+		want     []*project.ProjectWebhook
+		wantErr  bool
+	}{
+		{
+			name: "Should handle a successful request",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, r.Header.Get("circle-token"), "token")
+				assert.Equal(t, r.Header.Get("accept"), "application/json")
+				assert.Equal(t, r.Header.Get("user-agent"), version.UserAgent())
+
+				assert.Equal(t, r.Method, "GET")
+				assert.Equal(t, r.URL.Path, fmt.Sprintf("/api/v2/webhook"))
+
+				assert.Equal(t, r.URL.Query().Get("scope-id"), projId)
+				assert.Equal(t, r.URL.Query().Get("scope-type"), projType)
+				assert.Equal(t, r.URL.Query().Get("next_page_token"), nextPageToken)
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write([]byte(`
+				{
+				  "items": [
+				    {
+				      "url": "https://foobar.com",
+				      "verify-tls": true,
+				      "id": "0x0x0x0x0-0x0x-0000-xxxx-0x0x0x0x0x0x0",
+				      "signing-secret": "xxxxxx",
+				      "updated-at": "2015-09-21T17:29:21.042Z",
+				      "name": "foobar",
+				      "created-at": "2015-09-21T17:29:21.042Z",
+				      "scope": {
+					"id": "0000-0000-0000-0000",
+					"type": "project"
+				      },
+				      "events": [
+					"workflow-completed"
+				      ]
+				    }
+				  ],
+				  "next_page_token": ""
+				}`))
+				assert.NilError(t, err)
+			},
+			want: []*project.ProjectWebhook{
+				{
+					URL: "https://foobar.com",
+					VerifyTLS: true,
+					ID:"0x0x0x0x0-0x0x-0000-xxxx-0x0x0x0x0x0x0",
+					SigningSecret: "xxxxxx",
+					Name: "foobar",
+					Events: []string{
+						"workflow-completed",
+					},
+				},
+
+			},
+		},
+		{
+			name: "Should handle an error request",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("content-type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, err := w.Write([]byte(`{"message": "error"}`))
+				assert.NilError(t, err)
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			p, err := getProjectRestClient(server)
+			assert.NilError(t, err)
+
+			got, err := p.ListProjectWebhook(projId)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("projectRestClient.CreateEnvironmentVariable() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("projectRestClient.CreateEnvironmentVariable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

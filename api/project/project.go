@@ -11,6 +11,17 @@ type ProjectInfo struct {
 	Id string
 }
 
+// ProjectWebhookItem is the webhook of a Project
+type ProjectWebhook struct {
+	URL           string
+	VerifyTLS     bool
+	ID            string
+	SigningSecret string
+	Name          string
+	Events        []string
+}
+
+
 // ProjectClient is the interface to interact with project and it's
 // components.
 type ProjectClient interface {
@@ -18,4 +29,5 @@ type ProjectClient interface {
 	ListAllEnvironmentVariables(vcs, org, project string) ([]*ProjectEnvironmentVariable, error)
 	GetEnvironmentVariable(vcs, org, project, envName string) (*ProjectEnvironmentVariable, error)
 	CreateEnvironmentVariable(vcs, org, project string, v ProjectEnvironmentVariable) (*ProjectEnvironmentVariable, error)
+	ListProjectWebhook (id string) ([]*ProjectWebhook, error)
 }
